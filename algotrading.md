@@ -1,3 +1,17 @@
+---
+title: "ACTL1101 Assignment Part A"
+author: "Patrick Hua"
+date: "2024 T2"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
 ## Algorithmic Trading Strategy
 
@@ -32,22 +46,38 @@ After meeting with the Trading Strategies Team, you were asked to include costs,
 
 Start by running the provided code cells in the "Data Loading" section to generate a DataFrame containing AMD stock closing data. This will serve as the basis for your trading decisions. First, create a data frame named `amd_df` with the given closing prices and corresponding dates. 
 
-```r
+```{r load-data}
+
 # Load data from CSV file
 amd_df <- read.csv("AMD.csv")
+
 # Convert the date column to Date type and Adjusted Close as numeric
 amd_df$date <- as.Date(amd_df$Date)
 amd_df$close <- as.numeric(amd_df$Adj.Close)
+
 amd_df <- amd_df[, c("date", "close")]
 ```
 
-#### Plotting the Data
+
+##Plotting the Data
 Plot the closing prices over time to visualize the price movement.
-```r
+```{r plot}
 plot(amd_df$date, amd_df$close,'l')
 ```
 
-### Step 2: Trading Algorithm
+## Step 2: Customize Trading Period
+- Define a trading period you wanted in the past five years 
+```{r period}
+start_date <- as.Date('2023-01-03')
+end_date <- as.Date('2024-01-02')
+
+# Filter the dataframe according to the specified trading period
+amd_df <- amd_df[amd_df$date >= start_date & amd_df$date <= end_date, ]
+
+```
+
+
+## Step 3: Trading Algorithm
 Implement the trading algorithm as per the instructions. You should initialize necessary variables, and loop through the dataframe to execute trades based on the set conditions.
 
 - Initialize Columns: Start by ensuring dataframe has columns 'trade_type', 'costs_proceeds' and 'accumulated_shares'.
@@ -59,7 +89,9 @@ Implement the trading algorithm as per the instructions. You should initialize n
 
 
 
-```r
+```{r trading}
+# NOTE: To customize trading period run {r period} first
+
 # Initialize columns for trade type, cost/proceeds, and accumulated shares in amd_df
 amd_df$trade_type <- NA
 amd_df$costs_proceeds <- NA  # Corrected column name
@@ -71,50 +103,153 @@ share_size <- 100
 accumulated_shares <- 0
 
 for (i in 1:nrow(amd_df)) {
-# Fill your code here
+  # Set current price
+  current_price <- amd_df$close[i]
+  
+  # Check if first day
+  if (previous_price == 0) {
+    amd_df$trade_type[i] <- 'buy'
+    amd_df$costs_proceeds[i] <- - share_size * amd_df$close[i]
+    accumulated_shares <- share_size
+    
+  } else if (i == nrow(amd_df)) { # Check if last day
+    amd_df$trade_type[i] <- 'sell'
+    amd_df$costs_proceeds[i] <- current_price * accumulated_shares
+    
+  } else if (current_price < previous_price) { # Buy condition
+    amd_df$trade_type[i] <- 'buy'
+    amd_df$costs_proceeds[i] <- - share_size * amd_df$close[i]
+    accumulated_shares <- accumulated_shares + share_size
+  }
+  
+  # Update accumulated shares in the dataframe
+  amd_df$accumulated_shares[i] <- accumulated_shares
+
+  # Set previous price for next iteration
+  previous_price <- current_price
+  
 }
 ```
 
 
-### Step 3: Customize Trading Period
-- Define a trading period you wanted in the past five years 
-```r
-# Fill your code here
-```
-
-
-### Step 4: Run Your Algorithm and Analyze Results
+## Step 4: Run Your Algorithm and Analyze Results
 After running your algorithm, check if the trades were executed as expected. Calculate the total profit or loss and ROI from the trades.
 
 - Total Profit/Loss Calculation: Calculate the total profit or loss from your trades. This should be the sum of all entries in the 'costs_proceeds' column of your dataframe. This column records the financial impact of each trade, reflecting money spent on buys as negative values and money gained from sells as positive values.
 - Invested Capital: Calculate the total capital invested. This is equal to the sum of the 'costs_proceeds' values for all 'buy' transactions. Since these entries are negative (representing money spent), you should take the negative sum of these values to reflect the total amount invested.
 - ROI Formula: $$\text{ROI} = \left( \frac{\text{Total Profit or Loss}}{\text{Total Capital Invested}} \right) \times 100$$
 
-```r
-# Fill your code here
+```{r}
+# For the basic algorithm:
+
+# Sum the cost proceeds column whilst ignoring all the NA entries
+total_profit <- sum(amd_df$costs_proceeds, na.rm = TRUE)
+cat("Total profit is", total_profit, "\n")
+
+# Sum the cost proceeds column if the value is negative whilst ignoring all the NA entries
+total_capital_invested <- -sum(amd_df$costs_proceeds[amd_df$costs_proceeds < 0], na.rm = TRUE)
+cat("Total captial invested is", total_capital_invested, "\n")
+
+# Calcuate ROI using the formula
+roi <- total_profit/total_capital_invested * 100
+cat("ROI is", roi, "%\n")
+
 ```
 
-### Step 5: Profit-Taking Strategy or Stop-Loss Mechanisum (Choose 1)
+## Step 5: Profit-Taking Strategy or Stop-Loss Mechanisum (Choose 1)
 - Option 1: Implement a profit-taking strategy that you sell half of your holdings if the price has increased by a certain percentage (e.g., 20%) from the average purchase price.
 - Option 2: Implement a stop-loss mechanism in the trading strategy that you sell half of your holdings if the stock falls by a certain percentage (e.g., 20%) from the average purchase price. You don't need to buy 100 stocks on the days that the stop-loss mechanism is triggered.
 
+```{r option}
+# Option 1: Profit-Taking Strategy
 
-```r
+# Initialize columns for trade type, cost/proceeds, and accumulated shares in amd_df
+amd_df$trade_type <- NA
+amd_df$costs_proceeds <- NA  # Corrected column name
+amd_df$accumulated_shares <- 0  # Initialize if needed for tracking
+
+# Initialize variables for trading logic
+previous_price <- 0
+share_size <- 100
+accumulated_shares <- 0
+
+avg_price <- 0
+amd_df$avg_price <- 0
+take_profit_percentage <- 1.2
+
+for (i in 1:nrow(amd_df)) {
+  # Set current price
+  current_price <- amd_df$close[i]
+  
+  # Check if first day
+  if (previous_price == 0) {
+    amd_df$trade_type[i] <- 'buy'
+    amd_df$costs_proceeds[i] <- - share_size * amd_df$close[i]
+    accumulated_shares <- share_size
+    avg_price <- current_price
+    amd_df$avg_price[i] <- avg_price
+    
+  } else if (i == nrow(amd_df)) { # Check if last day
+    amd_df$trade_type[i] <- 'sell'
+    amd_df$costs_proceeds[i] <- current_price * accumulated_shares
+    
+  } else if (current_price > take_profit_percentage * avg_price) { # Sell condition
+    # Sell half your shares
+    amd_df$trade_type[i] <- 'sell'
+    amd_df$costs_proceeds[i] <- accumulated_shares / 2 * current_price
+    accumulated_shares <- accumulated_shares / 2
+    
+  } else if (current_price < previous_price) { # Buy condition
+    amd_df$trade_type[i] <- 'buy'
+    amd_df$costs_proceeds[i] <- - share_size * amd_df$close[i]
+    accumulated_shares <- accumulated_shares + share_size
+    
+    # Calculate average purchase price
+    avg_price <- (avg_price * (accumulated_shares - share_size) + (current_price*share_size)) / accumulated_shares
+  }
+  
+  # Update accumulated shares in the dataframe
+  amd_df$accumulated_shares[i] <- accumulated_shares
+
+  # Set previous price for next iteration
+  previous_price <- current_price
+  
+  # Update average purchase price in the dataframe
+  amd_df$avg_price[i] <- avg_price
+  
 # Fill your code here
+}
 ```
 
 
-### Step 6: Summarize Your Findings
+## Step 6: Summarize Your Findings
 - Did your P/L and ROI improve over your chosen period?
 - Relate your results to a relevant market event and explain why these outcomes may have occurred.
 
 
-```r
-# Fill your code here and Disucss
+```{r}
+# For the Profit Taking algorithm:
+
+# Sum the cost proceeds column whilst ignoring all the NA entries
+total_profit <- sum(amd_df$costs_proceeds, na.rm = TRUE)
+cat("Total profit is", total_profit, "\n")
+
+# Sum the cost proceeds column if the value is negative whilst ignoring all the NA entries
+total_capital_invested <- -sum(amd_df$costs_proceeds[amd_df$costs_proceeds < 0], na.rm = TRUE)
+cat("Total captial invested is", total_capital_invested, "\n")
+
+# Calcuate ROI using the formula
+roi <- total_profit/total_capital_invested * 100
+cat("ROI is", roi, "%\n")
+
 ```
 
-Sample Discussion: On Wednesday, December 6, 2023, AMD CEO Lisa Su discussed a new graphics processor designed for AI servers, with Microsoft and Meta as committed users. The rise in AMD shares on the following Thursday suggests that investors believe in the chipmaker's upward potential and market expectations; My first strategy earned X dollars more than second strategy on this day, therefore providing a better ROI.
+The P/L and ROI for the original algorithm was $428886 and 35.96529 % whilst my P/L and ROI for the profit-taking strategy was $256399 and 26.70439 % meaning my ROI for the profit-taking strategy was lower and did not improve compared to the original algorithm. This is because the profit-taking strategy provides a risk-managed approach, aiming to secure gains by selling positions incrementally as they reach predefined profit targets. While this approach can lead to a more stable portfolio and protect against market downturns, it may result in missing out on potential gains in a strongly bullish market compared to a buy and hold strategy.
 
 
+During my selected trading period (2023-01-03 to 2024-01-02), a key market event was the 14th of March 2023 where the announcement of the 4th Gen AMD EPYC™ Processors which featured world class performance and energy efficiency caused an increase in investor confidence. The rise in AMD shares on the following Thursday (March 16) signals high investor confidence in the company's potential, with share price jumping from to $87.45 on the 14th to $96.60 on the 16th. This significant price increase reflects the market's positive reaction to AMD's technological advancements and its strong positioning in the semiconductor industry. This strong performance of AMD is reflected in our ROI being higher in our buy and hold strategy as we are able to capture the full upside potential of the company whilst our ROI for the profit taking strategy is lower due to us selling our shares prematurely and not fully benefiting from the price surge following positive market events.
 
 
+Additionally, I found that we can improve our ROI using the profit taking method by setting a higher profit taking percentage as we get an ROI of 31.1383 % using a take profit percentage of 40 % as opposed to 20 %. This is because we lock in profits when price reaches a higher threshold, allowing us to capture a higher return in a strongly performing market, however having a higher threshold may put us at risk of a market downturn before reaching our profit target. To further reduce our risk in a volatile market we can also consider adding a stop loss algorithm simultaneously which protects us from large losses if the market performs poorly.
+
+In conclusion, our ROI for the profit taking strategy was lower than our original buy and hold strategy as AMD performed strongly and we were not able to capture the full upside using the profit taking strategy.
