@@ -1,17 +1,3 @@
----
-title: "ACTL1101 Assignment Part A"
-author: "Patrick Hua"
-date: "2024 T2"
-output:
-  html_document:
-    df_print: paged
-  word_document: default
-  pdf_document: default
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
 ## Algorithmic Trading Strategy
 
